@@ -1,18 +1,39 @@
-import sqlite3
+import os
 
-from fastapi import FastAPI, HTTPException
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
+from sqlalchemy import create_engine, Column, String
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
+load_dotenv()
 app = FastAPI()
-DB = "urls.db"
+DB_URL = os.environ.get("DATABASE_URL")
 
-conn = sqlite3.connect(DB)
-conn.execute("CREATE TABLE IF NOT EXISTS urls (short TEXT PRIMARY KEY, long TEXT NOT NULL)")
-conn.commit()
-conn.close()
+engine = create_engine(DB_URL)
+SessionLocal = sessionmaker(bind=engine)
+Base = declarative_base()
+
+
+class URL(Base):
+    __tablename__ = "urls"
+    short = Column(String, primary_key=True, index=True)
+    long = Column(String)
+
+
+Base.metadata.create_all(bind=engine)
+
 
 class URLRequest(BaseModel):
     long_url: str
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 def generate_short_id(length=6):
@@ -22,22 +43,21 @@ def generate_short_id(length=6):
 
 
 @app.post("/shorten")
-def shorten_url(request: URLRequest):
+def shorten_url(request: URLRequest, db: Session = Depends(get_db)):
     short_id = generate_short_id()
-    with sqlite3.connect(DB) as conn:
-        try:
-            conn.execute("INSERT INTO urls (short, long) VALUES (?, ?)", (short_id, request.long_url))
-            conn.commit()
-        except:
-            raise HTTPException(status_code=500, detail="Collision or database error")
+    db_url = URL(short_id, long=request.long_url)
+    try:
+        db.add(db_url)
+        db.commit()
+    except:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="DB insert failed")
     return {"short_url": f"http://localhost:8000/{short_id}"}
 
-@app.get("/{short_id}")
-def redirect(short_id: str):
-    with sqlite3.connect(DB) as conn:
-        cursor = conn.execute("SELECT long FROM urls WHERE short=?", (short_id,))
-        row = cursor.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail='Not found')
-        return {"long_url": row[0]}
 
+@app.get("/{short_id}")
+def redirect(short_id: str, db: Session = Depends(get_db)):
+    url: type[URL] = db.query(URL).filter(URL.short == short_id).first()
+    if not url:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"long_url": url.long}
