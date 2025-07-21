@@ -45,7 +45,7 @@ def generate_short_id(length=6):
 @app.post("/shorten")
 def shorten_url(request: URLRequest, db: Session = Depends(get_db)):
     short_id = generate_short_id()
-    db_url = URL(short_id, long=request.long_url)
+    db_url = URL(short=short_id, long=request.long_url)
     try:
         db.add(db_url)
         db.commit()
