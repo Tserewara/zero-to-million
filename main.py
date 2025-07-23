@@ -7,16 +7,14 @@ from sqlalchemy import create_engine, Column, String, QueuePool
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 import redis
 
+load_dotenv()
+app = FastAPI()
+DB_URL = os.environ.get("DATABASE_URL")
 # Replace with your Redis private IP
 REDIS_HOST = os.environ.get("REDIS_HOST")
 REDIS_PORT = 6379
 
 redis_client = redis.StrictRedis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
-
-load_dotenv()
-app = FastAPI()
-DB_URL = os.environ.get("DATABASE_URL")
-
 engine = create_engine(
     DB_URL,
     poolclass=QueuePool,
