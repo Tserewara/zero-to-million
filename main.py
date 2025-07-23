@@ -3,14 +3,20 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
-from sqlalchemy import create_engine, Column, String
+from sqlalchemy import create_engine, Column, String, QueuePool
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
 load_dotenv()
 app = FastAPI()
 DB_URL = os.environ.get("DATABASE_URL")
 
-engine = create_engine(DB_URL)
+engine = create_engine(
+    DB_URL,
+    poolclass=QueuePool,
+    pool_size=20,
+    max_overflow=10,
+    pool_timeout=30,
+)
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 
