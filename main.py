@@ -5,6 +5,13 @@ from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, String, QueuePool
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
+import redis
+
+# Replace with your Redis private IP
+REDIS_HOST = os.environ.get("REDIS_HOST")
+REDIS_PORT = 6379
+
+redis_client = redis.StrictRedis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
 load_dotenv()
 app = FastAPI()
@@ -63,7 +70,14 @@ def shorten_url(request: URLRequest, db: Session = Depends(get_db)):
 
 @app.get("/{short_id}")
 def redirect(short_id: str, db: Session = Depends(get_db)):
+    cached_url = redis_client.get(short_id)
+    if cached_url:
+        return {"long_url": cached_url}
+
     url: type[URL] = db.query(URL).filter(URL.short == short_id).first()
     if not url:
         raise HTTPException(status_code=404, detail="Not found")
+
+    redis_client.set(short_id, url.long, ex=3600)  # cache for 1 hour
+
     return {"long_url": url.long}
