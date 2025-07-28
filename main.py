@@ -53,6 +53,11 @@ def generate_short_id(length=6):
     import string
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
+@app.get("/whoami")
+def whoami():
+    hostname = socket.gethostname()
+    return {"hostname": hostname}
+
 
 @app.post("/shorten")
 def shorten_url(request: URLRequest, db: Session = Depends(get_db)):
@@ -80,9 +85,3 @@ def redirect(short_id: str, db: Session = Depends(get_db)):
     redis_client.set(short_id, url.long, ex=3600)  # cache for 1 hour
 
     return {"long_url": url.long}
-
-
-@app.get("/whoami")
-def whoami():
-    hostname = socket.gethostname()
-    return {"hostname": hostname}
