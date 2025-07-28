@@ -1,4 +1,5 @@
 import os
+import socket
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Depends
@@ -79,3 +80,9 @@ def redirect(short_id: str, db: Session = Depends(get_db)):
     redis_client.set(short_id, url.long, ex=3600)  # cache for 1 hour
 
     return {"long_url": url.long}
+
+
+@app.get("/whoami")
+def whoami():
+    hostname = socket.gethostname()
+    return {"hostname": hostname}
